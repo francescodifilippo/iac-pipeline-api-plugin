@@ -1,0 +1,7 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:entry title="Connection name" field="name"><f:textbox/></f:entry>
+  <f:entry title="API origin" field="url"><f:textbox/></f:entry>
+  <f:entry title="Secret Text credential" field="credentialsId"><f:credentials/></f:entry>
+  <f:entry title="Allow HTTP (local dev only)" field="allowHttp"><f:checkbox/></f:entry>
+</j:jelly>
