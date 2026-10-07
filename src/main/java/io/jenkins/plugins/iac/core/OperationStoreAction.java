@@ -8,8 +8,8 @@ import java.util.*;
 public final class OperationStoreAction extends InvisibleAction implements RunAction2 {
  private transient Run<?,?> owner;
  private Map<String,RemoteOperation> operations=new LinkedHashMap<>();
- @Override public void onAttached(Run<?,?> r){owner=r;}
- @Override public void onLoad(Run<?,?> r){owner=r;}
+ @Override public synchronized void onAttached(Run<?,?> r){owner=r;}
+ @Override public synchronized void onLoad(Run<?,?> r){owner=r;}
  public synchronized RemoteOperation get(String key){return operations.get(key);}
  public synchronized void begin(String key,String provider,String connectionId,String targetId,String requestToken,
   Map<String,String> metadata) throws IOException {
