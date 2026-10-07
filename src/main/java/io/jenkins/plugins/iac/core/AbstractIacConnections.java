@@ -5,7 +5,10 @@ import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import jenkins.model.GlobalConfiguration;
 import org.kohsuke.stapler.DataBoundSetter;
 import java.util.*;
-/** Subclass in each provider owns distinct Jenkins GlobalConfiguration storage. */
+/**
+ * Optional HTTP bearer-token connection helper for provider plugins.
+ * IacBackend does not require this transport model; non-HTTP providers may own a different configuration.
+ */
 public abstract class AbstractIacConnections extends GlobalConfiguration {
  private List<Connection> servers = new ArrayList<>();
  protected AbstractIacConnections(){load();}

@@ -4,11 +4,15 @@
 **Proposed GitHub repository:** `iac-pipeline-api-plugin`  
 **Version:** `0.1.0-SNAPSHOT` (source prototype)
 
-Shared internal API for two independent Jenkins plugins:
+Shared internal Jenkins API for independent infrastructure-execution providers. Current consumers are:
 - `otf-pipeline` — OTF Declarative Pipeline support
 - `terrakube-pipeline` — Terrakube Declarative Pipeline support
 
-Includes connection model, credentials handling, HTTP client, backend extension points, build-scoped remote-operation IDs, asynchronous polling and stage-wrapper implementation. Both provider plugins have a **required Maven/HPI dependency** on this plugin.
+The core lifecycle is provider-neutral: a provider receives a `SubmissionRequest` with a `connectionId`, opaque `targetId`, persisted `requestToken`, and provider parameters. Jenkins persists a `RemoteOperation` containing the remote ID, normalized status and provider-selected non-secret metadata.
+
+The plugin provides asynchronous polling, build-scoped operation correlation, restart safety, timeout handling and stage-wrapper base classes. It also contains reusable HTTP/token connection helpers for HTTP providers, but `IacBackend` does **not** require that transport model. Providers such as OCI Resource Manager can therefore use their native SDK/configuration model.
+
+Providers may opt in to idempotent resubmission by overriding `supportsIdempotentSubmit()` and honoring the persisted request token. Providers that do not opt in retain fail-safe behavior after an ambiguous restart instead of silently repeating a potentially destructive request.
 
 ## Build
 
@@ -16,8 +20,10 @@ Java 21, Maven 3.9.6+:
 
 ```bash
 mvn -B -ntp verify
-mvn -B -ntp install   # before testing provider plugins against the local SNAPSHOT
+mvn -B -ntp install
 ```
+
+Install the core SNAPSHOT locally before building provider plugins against the same source version.
 
 ## Release order
 
@@ -25,4 +31,4 @@ Release this plugin first; change each provider from `0.1.0-SNAPSHOT` to the exa
 
 ## Current limitations
 
-The split is complete at source level, **not** a verified plugin release. Real Jenkins test builds, restart tests and real server API tests remain necessary. The old prototype's asynchronous behavior and Declarative wrapper syntax must pass integration tests before they can be advertised as production-ready.
+This remains a source prototype, not a verified release. JenkinsRule coverage, controller restart/abort tests and real provider API integration tests are still required before production release.

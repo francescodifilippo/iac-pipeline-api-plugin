@@ -4,15 +4,16 @@ import org.kohsuke.stapler.DataBoundSetter;
 import java.util.Map;
 /** Parent for provider-specific Declarative stage wrapper options, not user-facing generic DSL. */
 public abstract class AbstractProvisionStep extends Step {
- private final String server,workspaceId;
+ private final String connectionId,targetId;
  private String operationKey;
  private boolean waitForCompletion=true;
  private int pollingSeconds=10,timeoutMinutes=60;
- protected AbstractProvisionStep(String server,String workspaceId){
-  this.server=Identifiers.required(server,"server");this.workspaceId=Identifiers.required(workspaceId,"workspaceId");
+ protected AbstractProvisionStep(String connectionId,String targetId){
+  this.connectionId=Identifiers.required(connectionId,"connectionId");
+  this.targetId=Identifiers.opaque(targetId,"targetId");
  }
- public String getServer(){return server;}
- public String getWorkspaceId(){return workspaceId;}
+ public String getConnectionId(){return connectionId;}
+ public String getTargetId(){return targetId;}
  public String getOperationKey(){return operationKey;}
  public boolean isWaitForCompletion(){return waitForCompletion;}
  public int getPollingSeconds(){return pollingSeconds;}
@@ -24,7 +25,8 @@ public abstract class AbstractProvisionStep extends Step {
  protected abstract String provider();
  protected abstract Map<String,String> parameters();
  @Override public final StepExecution start(StepContext context){
-  return new RemoteExecution(context,provider(),server,workspaceId,operationKey==null?provider()+"-"+workspaceId:operationKey,
+  String key=operationKey==null?Identifiers.defaultOperationKey(provider(),targetId):operationKey;
+  return new RemoteExecution(context,provider(),connectionId,targetId,key,
     parameters(),waitForCompletion,pollingSeconds,timeoutMinutes,false);
  }
 }

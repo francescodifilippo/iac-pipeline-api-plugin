@@ -1,0 +1,4 @@
+<?jelly escape-by-default='true'?>
+<div>
+  Shared Jenkins Pipeline API for provider-neutral infrastructure automation, asynchronous execution, credentials, and remote job lifecycle management.
+</div>
