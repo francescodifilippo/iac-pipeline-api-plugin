@@ -8,6 +8,13 @@ class IdentifiersTest {
   assertThrows(IllegalArgumentException.class, () -> Identifiers.required("../etc", "workspace"));
   assertThrows(IllegalArgumentException.class, () -> Identifiers.required("a?b", "workspace"));
  }
+ @Test void opaqueProviderIdentifiers() {
+  String stack="ocid1.ormstack.oc1.eu-frankfurt-1.example";
+  assertEquals(stack,Identifiers.opaque(stack,"targetId"));
+  assertEquals(Identifiers.defaultOperationKey("oci-rm",stack),Identifiers.defaultOperationKey("oci-rm",stack));
+  assertTrue(Identifiers.defaultOperationKey("oci-rm",stack).startsWith("oci-rm-"));
+  assertThrows(IllegalArgumentException.class,()->Identifiers.opaque("bad\nvalue","remoteId"));
+ }
  @Test void safeUrls() {
   assertEquals("https://iac.example.org", HttpJsonClient.validateUrl("https://iac.example.org/", false).toString());
   assertThrows(IllegalArgumentException.class, () -> HttpJsonClient.validateUrl("http://iac.example.org", false));
