@@ -45,7 +45,7 @@ public final class OperationStoreAction extends InvisibleAction implements RunAc
  }
 
  @SuppressWarnings("unused")
- private Object readResolve(){
+ private synchronized Object readResolve(){
   if(operations==null)operations=new LinkedHashMap<>();
   return this;
  }
