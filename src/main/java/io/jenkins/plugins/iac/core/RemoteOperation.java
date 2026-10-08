@@ -1,5 +1,7 @@
 package io.jenkins.plugins.iac.core;
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 /** Durable provider-neutral correlation record. Metadata must never contain credentials or secrets. */
 public record RemoteOperation(
@@ -22,8 +24,9 @@ public record RemoteOperation(
   requestToken=Identifiers.required(requestToken,"requestToken");
   remoteId=Identifiers.optionalOpaque(remoteId,"remoteId");
   status=Identifiers.opaque(status,"status");
-  metadata=metadata==null?Map.of():Map.copyOf(metadata);
+  metadata=metadata==null?new LinkedHashMap<>():new LinkedHashMap<>(metadata);
  }
+ @Override public Map<String,String> metadata(){return Collections.unmodifiableMap(metadata);}
  public RemoteOperation accepted(String id,String newStatus){
   return new RemoteOperation(key,provider,connectionId,targetId,requestToken,
     Identifiers.opaque(id,"remoteId"),newStatus,metadata,startedAt);
