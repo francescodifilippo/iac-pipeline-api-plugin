@@ -14,7 +14,7 @@
  </scm>
  <issueManagement><system>GitHub</system><url>https://github.com/francescodifilippo/iac-pipeline-api-plugin/issues</url></issueManagement>
  <properties><jenkins.baseline>2.568</jenkins.baseline><jenkins.version>${jenkins.baseline}.3</jenkins.version><java.level>21</java.level></properties>
- <dependencyManagement><dependencies><dependency><groupId>io.jenkins.tools.bom</groupId><artifactId>bom-${jenkins.baseline}.x</artifactId><version>7020.vf38cb_40380d1</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
+ <dependencyManagement><dependencies><dependency><groupId>io.jenkins.tools.bom</groupId><artifactId>bom-${jenkins.baseline}.x</artifactId><version>7134.vc450c4b_83de0</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
  <dependencies>
   <dependency><groupId>org.jenkins-ci.plugins.workflow</groupId><artifactId>workflow-step-api</artifactId></dependency>
   <dependency><groupId>org.jenkins-ci.plugins</groupId><artifactId>credentials</artifactId></dependency>
