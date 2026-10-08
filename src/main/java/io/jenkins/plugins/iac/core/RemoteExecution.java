@@ -4,6 +4,7 @@ import hudson.model.TaskListener;
 import jenkins.util.Timer;
 import org.jenkinsci.plugins.workflow.steps.*;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
@@ -26,7 +27,8 @@ public final class RemoteExecution extends StepExecution {
  public RemoteExecution(StepContext context,String provider,String connectionId,String targetId,String key,
   Map<String,String> parameters,boolean wait,int poll,int timeout,boolean awaitOnly){
   super(context);this.provider=provider;this.connectionId=connectionId;this.targetId=targetId;this.key=key;
-  this.parameters=Map.copyOf(parameters);waitForCompletion=wait;pollingSeconds=poll;timeoutMinutes=timeout;this.awaitOnly=awaitOnly;
+  this.parameters=parameters==null?new LinkedHashMap<>():new LinkedHashMap<>(parameters);
+  waitForCompletion=wait;pollingSeconds=poll;timeoutMinutes=timeout;this.awaitOnly=awaitOnly;
  }
  @Override public boolean start(){waitStartedAt=System.currentTimeMillis();schedule(0);return false;}
  @Override public void onResume(){if(!bodyStarted)schedule(0);}
