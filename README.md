@@ -1,34 +1,86 @@
 # IaC Pipeline API
 
-**Proposed Jenkins plugin ID:** `iac-pipeline-api`  
-**Proposed GitHub repository:** `iac-pipeline-api-plugin`  
-**Version:** `0.1.0-SNAPSHOT` (source prototype)
+**Plugin ID:** `iac-pipeline-api`  
+**Status:** pre-release
 
-Shared internal Jenkins API for independent infrastructure-execution providers. Current consumers are:
-- `otf-pipeline` — OTF Declarative Pipeline support
-- `terrakube-pipeline` — Terrakube Declarative Pipeline support
+Shared Jenkins Pipeline API for remote infrastructure-as-code execution. It provides the durable, provider-neutral lifecycle used by the OTF, Terrakube, and OCI Resource Manager provider plugins.
 
-The core lifecycle is provider-neutral: a provider receives a `SubmissionRequest` with a `connectionId`, opaque `targetId`, persisted `requestToken`, and provider parameters. Jenkins persists a `RemoteOperation` containing the remote ID, normalized status and provider-selected non-secret metadata.
+## Requirements
 
-The plugin provides asynchronous polling, build-scoped operation correlation, restart safety, timeout handling and stage-wrapper base classes. It also contains reusable HTTP/token connection helpers for HTTP providers, but `IacBackend` does **not** require that transport model. Providers such as OCI Resource Manager can therefore use their native SDK/configuration model.
+- Jenkins 2.568.3 or newer
+- Java 21
+- Maven 3.9.6+ for development
 
-Providers may opt in to idempotent resubmission by overriding `supportsIdempotentSubmit()` and honoring the persisted request token. Providers that do not opt in retain fail-safe behavior after an ambiguous restart instead of silently repeating a potentially destructive request.
+## Provider family
 
-## Build
+- [OTF Pipeline](https://github.com/francescodifilippo/otf-pipeline-plugin)
+- [Terrakube Pipeline](https://github.com/francescodifilippo/terrakube-pipeline-plugin)
+- [OCI Resource Manager Pipeline](https://github.com/francescodifilippo/oci-resource-manager-pipeline-plugin)
 
-Java 21, Maven 3.9.6+:
+Provider plugins expose user-facing Pipeline syntax. This core plugin intentionally does not provide a generic end-user provisioning step.
+
+## Architecture
+
+`IacBackend` is the provider extension point.
+
+A submission receives a provider-neutral `SubmissionRequest` containing:
+
+- `connectionId`
+- opaque `targetId`
+- durable `requestToken`
+- non-secret provider parameters
+
+Jenkins persists a build-scoped `RemoteOperation` containing the provider, connection, target, remote ID, status, request token, and provider-selected non-secret metadata.
+
+The core also provides:
+
+- asynchronous polling without holding a Jenkins executor;
+- `waitForCompletion: false` plus later await semantics;
+- build-scoped operation correlation through `operationKey`;
+- timeout handling;
+- restart-safe state persistence;
+- optional idempotent resubmission for providers that can honor the persisted request token.
+
+## Restart and durability
+
+The remote identity is stored on the Jenkins build. After a controller restart, polling can continue from the persisted `RemoteOperation`.
+
+If Jenkins restarts after submission started but before a remote ID was saved:
+
+- providers that implement `supportsIdempotentSubmit()` may safely resubmit with the persisted request token;
+- other providers fail closed and require provider-side reconciliation rather than risking a duplicate destructive request.
+
+## Security
+
+Credentials must never be stored in `SubmissionRequest.parameters`, `RemoteOperation.metadata`, logs, or Pipeline source. Provider plugins are responsible for resolving credentials from Jenkins Credentials at execution time.
+
+Suspected vulnerabilities should follow [SECURITY.md](SECURITY.md).
+
+## Compatibility
+
+The current API is pre-release and may still evolve before the first published Jenkins release. Once the first public release is made, changes to provider-facing contracts should follow normal compatibility and deprecation practices.
+
+## Development
 
 ```bash
 mvn -B -ntp verify
 mvn -B -ntp install
 ```
 
-Install the core SNAPSHOT locally before building provider plugins against the same source version.
+Provider repositories can then build against the locally installed `0.1.0-SNAPSHOT`.
 
-## Release order
+The test suite includes Jenkins test-harness coverage for persisted operation state across controller restarts.
 
-Release this plugin first; change each provider from `0.1.0-SNAPSHOT` to the exact released core version before publishing the provider. Do not publish a provider until the declared core version is available from the Jenkins plugin repository.
+## CI and Jenkins hosting
 
-## Current limitations
+GitHub Actions validates pull requests with Java 21. A root `Jenkinsfile` is also present for future use by `ci.jenkins.io` after the repository is accepted into the `jenkinsci` organization.
 
-This remains a source prototype, not a verified release. JenkinsRule coverage, controller restart/abort tests and real provider API integration tests are still required before production release.
+Before publishing provider plugins, release this core first and replace provider SNAPSHOT dependencies with the released core version.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
