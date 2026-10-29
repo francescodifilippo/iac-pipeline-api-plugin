@@ -17,20 +17,20 @@ public final class Identifiers {
   return value;
  }
  public static String optionalOpaque(String value,String name){return value==null || value.isBlank()?null:opaque(value,name);}
- public static String defaultOperationKey(String provider,String targetId){
-  String p=required(provider,"provider");
-  String t=opaque(targetId,"targetId");
-  return p+"-"+UUID.nameUUIDFromBytes(t.getBytes(StandardCharsets.UTF_8));
- }
+ /** Same as {@link #defaultOperationKey(String,String,Map)} with no parameters; targetId may be null. */
+ public static String defaultOperationKey(String provider,String targetId){return defaultOperationKey(provider,targetId,null);}
  /**
   * Deterministic default key for one provider, target and parameter set, so e.g. a plan and an apply stage
   * on the same target get different keys. Parameter order is irrelevant; no parameters gives the
-  * {@link #defaultOperationKey(String,String)} value.
+  * {@link #defaultOperationKey(String,String)} value. A null (or blank) targetId, for a target named in the
+  * parameters, gives a key distinct from every non-null targetId.
   */
  public static String defaultOperationKey(String provider,String targetId,Map<String,String> parameters){
   String p=required(provider,"provider");
-  // targetId cannot contain control characters, and entries are length-prefixed, so the encoding is unambiguous.
-  StringBuilder b=new StringBuilder(opaque(targetId,"targetId"));
+  String t=optionalOpaque(targetId,"targetId");
+  // targetId cannot contain control characters (so the null marker cannot collide), and entries are
+  // length-prefixed, so the encoding is unambiguous.
+  StringBuilder b=new StringBuilder(t==null?"\0":t);
   if(parameters!=null)for(Map.Entry<String,String> e:new TreeMap<>(parameters).entrySet())
    b.append('\0').append(lengthPrefixed(e.getKey())).append(lengthPrefixed(e.getValue()));
   return p+"-"+UUID.nameUUIDFromBytes(b.toString().getBytes(StandardCharsets.UTF_8));
