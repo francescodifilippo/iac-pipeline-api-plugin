@@ -26,6 +26,8 @@ public final class RemoteExecution extends StepExecution {
  private volatile boolean stopped;
  private long waitStartedAt;
  private int transientStatusFailures;
+ private volatile BodyExecution body;
+ private transient volatile Throwable stopCause;
  private transient ScheduledFuture<?> scheduled;
  public RemoteExecution(StepContext context,String provider,String connectionId,String targetId,String key,
   Map<String,String> parameters,boolean wait,int poll,int timeout,boolean awaitOnly){
@@ -115,12 +117,19 @@ public final class RemoteExecution extends StepExecution {
   if(stopped || bodyStarted) return;
   bodyStarted=true;
   getContext().saveState();
-  getContext().newBodyInvoker().withCallback(BodyExecutionCallback.wrap(getContext())).start();
+  BodyExecution started=getContext().newBodyInvoker().withCallback(BodyExecutionCallback.wrap(getContext())).start();
+  body=started;
+  // stop() may have run between the stopped check and the assignment above, seeing no body yet.
+  if(stopped)started.cancel(stopCause);
  }
  @Override public void stop(Throwable cause){
+  stopCause=cause;
   stopped=true;
   if(scheduled!=null)scheduled.cancel(false);
   // We do not silently cancel remote jobs on Jenkins abort; remote cancel must be explicit.
-  getContext().onFailure(cause);
+  BodyExecution running=body;
+  // The body callback completes the step context once the cancelled body unwinds.
+  if(running!=null)running.cancel(cause);
+  else getContext().onFailure(cause);
  }
 }
