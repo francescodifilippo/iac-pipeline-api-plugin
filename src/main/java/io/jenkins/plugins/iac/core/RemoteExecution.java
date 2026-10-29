@@ -28,6 +28,9 @@ public final class RemoteExecution extends StepExecution {
  private int transientStatusFailures;
  /** Identifies the operation this (non-await) execution submits; persisted with the execution. */
  private String requestToken;
+ /** {@link IacBackend#resolve} result, persisted with the token; null in executions saved before resolution existed. */
+ private String resolvedTargetId;
+ private LinkedHashMap<String,String> resolvedParameters;
  private volatile BodyExecution body;
  private transient volatile Throwable stopCause;
  private transient ScheduledFuture<?> scheduled;
@@ -71,14 +74,17 @@ public final class RemoteExecution extends StepExecution {
    }else if(operation==null){
     // Executions persisted before request tokens were kept on the execution resume with none.
     String token=requestToken==null?UUID.randomUUID().toString():requestToken;
-    // Persist the token with the execution before it becomes visible in the build's operation store. A restart
-    // before this point resubmits nothing (no stored operation); after it, the resumed execution recognizes
-    // the stored operation as its own. With a durability hint that skips per-step saves, saveState() is a
-    // no-op, and only a clean shutdown (which saves the program) keeps the build resumable anyway.
+    // Lookups are reads: a restart before the save below simply resolves again.
+    if(resolvedTargetId==null)resolve(backend,run);
+    // Persist the token and resolved target with the execution before they become visible in the build's
+    // operation store. A restart before this point resubmits nothing (no stored operation); after it, the
+    // resumed execution recognizes the stored operation as its own. With a durability hint that skips per-step
+    // saves, saveState() is a no-op, and only a clean shutdown (which saves the program) keeps the build
+    // resumable anyway.
     getContext().saveState().get(1,TimeUnit.MINUTES);
-    SubmissionRequest request=new SubmissionRequest(connectionId,targetId,token,parameters);
-    store.begin(key,provider,connectionId,targetId,token,backend.operationMetadata(request));
-    log("submitting target "+targetId+" with operationKey "+key);
+    SubmissionRequest request=new SubmissionRequest(connectionId,resolvedTargetId,token,resolvedParameters);
+    store.begin(key,provider,connectionId,resolvedTargetId,token,backend.operationMetadata(request));
+    log("submitting target "+resolvedTargetId+" with operationKey "+key);
     JobResult created=backend.submit(request,run);
     acceptCreated(store,created);
     return;
@@ -92,7 +98,8 @@ public final class RemoteExecution extends StepExecution {
       throw new IllegalStateException("Submission was interrupted before remote ID was saved for "+key+
        ". Reconcile manually with the provider before retrying.");
     log("retrying interrupted submission with persisted request token for "+key);
-    SubmissionRequest request=new SubmissionRequest(operation.connectionId(),operation.targetId(),operation.requestToken(),parameters);
+    SubmissionRequest request=new SubmissionRequest(operation.connectionId(),operation.targetId(),operation.requestToken(),
+     resolvedParameters==null?parameters:resolvedParameters);
     JobResult created=backend.submit(request,run);
     acceptCreated(store,created);
     return;
@@ -117,6 +124,16 @@ public final class RemoteExecution extends StepExecution {
    if(result.needsApproval())log("approval pending for ID "+operation.remoteId()+"; approve in provider UI");
    schedule(pollingSeconds);
   }catch(Throwable e){getContext().onFailure(e);}
+ }
+ private void resolve(IacBackend backend,Run<?,?> run) throws Exception {
+  ResolvedTarget resolved=backend.resolve(connectionId,targetId,parameters,run);
+  if(resolved==null)throw new IllegalStateException("Provider "+provider+" resolved no target");
+  if(!resolved.targetId().equals(targetId))log("resolved target to "+resolved.targetId());
+  // Parameters are non-secret by contract; log the IDs a lookup added or changed.
+  for(Map.Entry<String,String> e:resolved.parameters().entrySet())
+   if(e.getValue()!=null&&!e.getValue().equals(parameters.get(e.getKey())))log("resolved "+e.getKey()+" to "+e.getValue());
+  resolvedParameters=new LinkedHashMap<>(resolved.parameters());
+  resolvedTargetId=resolved.targetId();
  }
  static String duplicateKeyMessage(String key){
   return "operationKey '"+key+"' is already used by another provision step in this build. "+
