@@ -16,6 +16,8 @@ import java.util.concurrent.TimeUnit;
  */
 public final class RemoteExecution extends StepExecution {
  private static final long serialVersionUID=1L;
+ /** Consecutive transient status-poll failures tolerated before the step fails. */
+ static final int MAX_TRANSIENT_STATUS_FAILURES=5;
  private final String provider,connectionId,targetId,key;
  private final Map<String,String> parameters;
  private final boolean waitForCompletion,awaitOnly;
@@ -23,6 +25,7 @@ public final class RemoteExecution extends StepExecution {
  private volatile boolean bodyStarted;
  private volatile boolean stopped;
  private long waitStartedAt;
+ private int transientStatusFailures;
  private transient ScheduledFuture<?> scheduled;
  public RemoteExecution(StepContext context,String provider,String connectionId,String targetId,String key,
   Map<String,String> parameters,boolean wait,int poll,int timeout,boolean awaitOnly){
@@ -81,7 +84,15 @@ public final class RemoteExecution extends StepExecution {
    if(!waitForCompletion&&!awaitOnly){startBody();return;}
    if(System.currentTimeMillis()-(waitStartedAt == 0 ? operation.startedAt():waitStartedAt)>TimeUnit.MINUTES.toMillis(timeoutMinutes))
      throw new IOException("Remote operation wait timed out for "+key+" (remote execution may continue)");
-   JobResult result=backend.status(operation,run);
+   JobResult result;
+   try{result=backend.status(operation,run);}
+   catch(Exception e){
+    if(!retryStatus(backend,e))throw e;
+    log("transient error polling ID "+operation.remoteId()+" (attempt "+transientStatusFailures+"/"+
+     MAX_TRANSIENT_STATUS_FAILURES+"), retrying in "+pollingSeconds+"s: "+describe(e));
+    schedule(pollingSeconds);return;
+   }
+   statusSucceeded();
    store.status(key,result.status());
    if(result.completed()){
     if(!result.successful())throw new IOException("Remote operation "+operation.remoteId()+" failed: "+result.status());
@@ -90,6 +101,15 @@ public final class RemoteExecution extends StepExecution {
    if(result.needsApproval())log("approval pending for ID "+operation.remoteId()+"; approve in provider UI");
    schedule(pollingSeconds);
   }catch(Throwable e){getContext().onFailure(e);}
+ }
+ /** Counts a failed status poll; true if it is transient and the consecutive-failure budget is not exhausted. */
+ boolean retryStatus(IacBackend backend,Exception e){
+  if(e instanceof InterruptedException || !backend.isTransient(e))return false;
+  return ++transientStatusFailures<=MAX_TRANSIENT_STATUS_FAILURES;
+ }
+ void statusSucceeded(){transientStatusFailures=0;}
+ private static String describe(Exception e){
+  return e.getMessage()==null?e.getClass().getSimpleName():e.getClass().getSimpleName()+": "+e.getMessage();
  }
  private void startBody() throws Exception {
   if(stopped || bodyStarted) return;
