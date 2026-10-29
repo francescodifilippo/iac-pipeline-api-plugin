@@ -41,6 +41,18 @@ The core also provides:
 - restart-safe state persistence;
 - optional idempotent resubmission for providers that can honor the persisted request token.
 
+## Operation keys
+
+Each provision stage records its remote operation in the build under an `operationKey`.
+
+- If `operationKey` is not set, the default key is derived from the provider, the target, and the stage's provision parameters (for example `mode`). A plan stage and an apply stage on the same target therefore get different keys and both submit.
+- A provision stage never adopts an operation that another provision stage of the same build recorded. Reusing a key fails the stage with a message asking for a distinct `operationKey` in the stage options. This also applies when a provision stage runs again in the same build (for example inside `retry`): give each attempt its own key.
+- Set `operationKey` explicitly whenever a later stage refers to the operation, for example an await stage after `waitForCompletion: false`.
+
+## Status polling
+
+A failed status poll that the provider classifies as transient (`IacBackend.isTransient`) is logged and retried at the next polling interval, up to 5 consecutive times. A successful poll resets the count, and the stage timeout still applies. By default, I/O errors and HTTP 5xx, 408, and 429 responses are transient, and other HTTP 4xx responses fail immediately. Submissions are never retried this way.
+
 ## Restart and durability
 
 The remote identity is stored on the Jenkins build. After a controller restart, polling can continue from the persisted `RemoteOperation`.
