@@ -1,5 +1,7 @@
 package io.jenkins.plugins.iac.core;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 public final class Identifiers {
  private Identifiers(){}
@@ -20,4 +22,18 @@ public final class Identifiers {
   String t=opaque(targetId,"targetId");
   return p+"-"+UUID.nameUUIDFromBytes(t.getBytes(StandardCharsets.UTF_8));
  }
+ /**
+  * Deterministic default key for one provider, target and parameter set, so e.g. a plan and an apply stage
+  * on the same target get different keys. Parameter order is irrelevant; no parameters gives the
+  * {@link #defaultOperationKey(String,String)} value.
+  */
+ public static String defaultOperationKey(String provider,String targetId,Map<String,String> parameters){
+  String p=required(provider,"provider");
+  // targetId cannot contain control characters, and entries are length-prefixed, so the encoding is unambiguous.
+  StringBuilder b=new StringBuilder(opaque(targetId,"targetId"));
+  if(parameters!=null)for(Map.Entry<String,String> e:new TreeMap<>(parameters).entrySet())
+   b.append('\0').append(lengthPrefixed(e.getKey())).append(lengthPrefixed(e.getValue()));
+  return p+"-"+UUID.nameUUIDFromBytes(b.toString().getBytes(StandardCharsets.UTF_8));
+ }
+ private static String lengthPrefixed(String value){return value==null?"-1:":value.length()+":"+value;}
 }
