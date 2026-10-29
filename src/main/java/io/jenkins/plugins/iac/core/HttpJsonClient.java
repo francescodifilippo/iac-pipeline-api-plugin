@@ -47,5 +47,5 @@ public final class HttpJsonClient implements AutoCloseable {
   String status=data.path("attributes").path("status").asText("unknown").toLowerCase(java.util.Locale.ROOT);
   return new JobResult(data.path("id").asText(),status,done.contains(status)||failed.contains(status),done.contains(status),approval.contains(status));
  }
- @Override public void close(){}
+ @Override public void close(){http.close();}
 }
