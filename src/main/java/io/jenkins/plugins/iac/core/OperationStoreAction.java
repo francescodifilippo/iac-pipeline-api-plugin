@@ -20,7 +20,7 @@ public final class OperationStoreAction extends InvisibleAction implements RunAc
  public synchronized void begin(String key,String provider,String connectionId,String targetId,String requestToken,
   Map<String,String> metadata) throws IOException {
   Identifiers.required(key,"operationKey");
-  if(operations.containsKey(key)) throw new IllegalStateException("operationKey already exists in build: "+key);
+  if(operations.containsKey(key)) throw new IllegalStateException(RemoteExecution.duplicateKeyMessage(key));
   operations.put(key,new RemoteOperation(key,provider,connectionId,targetId,requestToken,null,"submitting",metadata,System.currentTimeMillis()));
   owner.save();
  }

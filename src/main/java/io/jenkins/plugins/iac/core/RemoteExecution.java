@@ -26,6 +26,8 @@ public final class RemoteExecution extends StepExecution {
  private volatile boolean stopped;
  private long waitStartedAt;
  private int transientStatusFailures;
+ /** Identifies the operation this (non-await) execution submits; persisted with the execution. */
+ private String requestToken;
  private volatile BodyExecution body;
  private transient volatile Throwable stopCause;
  private transient ScheduledFuture<?> scheduled;
@@ -35,7 +37,10 @@ public final class RemoteExecution extends StepExecution {
   this.parameters=parameters==null?new LinkedHashMap<>():new LinkedHashMap<>(parameters);
   waitForCompletion=wait;pollingSeconds=poll;timeoutMinutes=timeout;this.awaitOnly=awaitOnly;
  }
- @Override public boolean start(){waitStartedAt=System.currentTimeMillis();schedule(0);return false;}
+ @Override public boolean start(){
+  if(!awaitOnly)requestToken=UUID.randomUUID().toString();
+  waitStartedAt=System.currentTimeMillis();schedule(0);return false;
+ }
  @Override public void onResume(){if(!bodyStarted)schedule(0);}
  private void schedule(long seconds){scheduled=Timer.get().schedule(this::advance,seconds,TimeUnit.SECONDS);}
  private void log(String m) throws IOException,InterruptedException {
@@ -64,13 +69,22 @@ public final class RemoteExecution extends StepExecution {
     if(!provider.equals(operation.provider())||!connectionId.equals(operation.connectionId()))
       throw new IllegalStateException("Wait provider/connection differs from original submission for "+key);
    }else if(operation==null){
-    String requestToken=UUID.randomUUID().toString();
-    SubmissionRequest request=new SubmissionRequest(connectionId,targetId,requestToken,parameters);
-    store.begin(key,provider,connectionId,targetId,requestToken,backend.operationMetadata(request));
+    // Executions persisted before request tokens were kept on the execution resume with none.
+    String token=requestToken==null?UUID.randomUUID().toString():requestToken;
+    // Persist the token with the execution before it becomes visible in the build's operation store. A restart
+    // before this point resubmits nothing (no stored operation); after it, the resumed execution recognizes
+    // the stored operation as its own. With a durability hint that skips per-step saves, saveState() is a
+    // no-op, and only a clean shutdown (which saves the program) keeps the build resumable anyway.
+    getContext().saveState().get(1,TimeUnit.MINUTES);
+    SubmissionRequest request=new SubmissionRequest(connectionId,targetId,token,parameters);
+    store.begin(key,provider,connectionId,targetId,token,backend.operationMetadata(request));
     log("submitting target "+targetId+" with operationKey "+key);
     JobResult created=backend.submit(request,run);
     acceptCreated(store,created);
     return;
+   }else if(requestToken!=null&&!requestToken.equals(operation.requestToken())){
+    // Another provision step of this build (or an earlier attempt of this one, e.g. inside retry) owns the key.
+    throw new IllegalStateException(duplicateKeyMessage(key));
    }
    if(operation.remoteId()==null){
     if(awaitOnly)throw new IllegalStateException("Remote submission has no saved remote ID for "+key);
@@ -103,6 +117,10 @@ public final class RemoteExecution extends StepExecution {
    if(result.needsApproval())log("approval pending for ID "+operation.remoteId()+"; approve in provider UI");
    schedule(pollingSeconds);
   }catch(Throwable e){getContext().onFailure(e);}
+ }
+ static String duplicateKeyMessage(String key){
+  return "operationKey '"+key+"' is already used by another provision step in this build. "+
+   "Set a distinct operationKey in the stage options (a provision step re-run in the same build, e.g. inside retry, also needs its own key).";
  }
  /** Counts a failed status poll; true if it is transient and the consecutive-failure budget is not exhausted. */
  boolean retryStatus(IacBackend backend,Exception e){

@@ -25,8 +25,9 @@ public abstract class AbstractProvisionStep extends Step {
  protected abstract String provider();
  protected abstract Map<String,String> parameters();
  @Override public final StepExecution start(StepContext context){
-  String key=operationKey==null?Identifiers.defaultOperationKey(provider(),targetId):operationKey;
+  Map<String,String> p=parameters();
+  String key=operationKey==null?Identifiers.defaultOperationKey(provider(),targetId,p):operationKey;
   return new RemoteExecution(context,provider(),connectionId,targetId,key,
-    parameters(),waitForCompletion,pollingSeconds,timeoutMinutes,false);
+    p,waitForCompletion,pollingSeconds,timeoutMinutes,false);
  }
 }
