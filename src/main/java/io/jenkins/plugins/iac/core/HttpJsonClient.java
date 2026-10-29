@@ -53,7 +53,9 @@ public final class HttpJsonClient implements AutoCloseable {
   catch(IOException e){throw new IOException("IaC API returned malformed JSON",e);}
  }
  URI uri(String path,Map<String,String> query){
-  if(path==null || !path.startsWith("/") || path.contains("?") || path.contains("#")) throw new IllegalArgumentException("Invalid API path");
+  // "//host/..." would resolve to another authority and send the token there.
+  if(path==null || !path.startsWith("/") || path.startsWith("//") || path.contains("?") || path.contains("#"))
+   throw new IllegalArgumentException("Invalid API path");
   for(String segment:path.split("/",-1)){
    String decoded;
    try{decoded=java.net.URLDecoder.decode(segment.replace("+","%2B"),StandardCharsets.UTF_8);}
