@@ -36,7 +36,7 @@ public final class HttpJsonClient implements AutoCloseable {
   else b.method(method,HttpRequest.BodyPublishers.noBody());
   HttpResponse<String> response=http.send(b.build(),HttpResponse.BodyHandlers.ofString());
   if(response.statusCode()<200 || response.statusCode()>=300)
-    throw new IOException("IaC API HTTP "+response.statusCode()+" for "+method+" "+path);
+    throw new IacHttpException(response.statusCode(),method,path);
   if(response.body().isBlank()) return JSON.createObjectNode();
   try{return JSON.readTree(response.body());}
   catch(IOException e){throw new IOException("IaC API returned malformed JSON",e);}
