@@ -1,7 +1,9 @@
 package io.jenkins.plugins.iac.core;
 import static org.junit.jupiter.api.Assertions.*;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 class IdentifiersTest {
  @Test void basicIdentifiers() {
@@ -33,6 +35,26 @@ class IdentifiersTest {
   assertEquals(Identifiers.defaultOperationKey("otf",ws,ab),Identifiers.defaultOperationKey("otf",ws,ba),"order-independent");
   assertNotEquals(Identifiers.defaultOperationKey("otf",ws,Map.of("a","b1:c")),
     Identifiers.defaultOperationKey("otf",ws,Map.of("a","b","1:c","")),"unambiguous encoding");
+ }
+ @Test void defaultKeyForNonNullTargetIsUnchanged() {
+  assertEquals("otf-"+UUID.nameUUIDFromBytes("ws-123".getBytes(StandardCharsets.UTF_8)),Identifiers.defaultOperationKey("otf","ws-123"));
+  assertEquals("otf-"+UUID.nameUUIDFromBytes(("ws-123"+'\0'+"4:mode4:plan").getBytes(StandardCharsets.UTF_8)),
+    Identifiers.defaultOperationKey("otf","ws-123",Map.of("mode","plan")));
+ }
+ @Test void defaultKeyForNamedTarget() {
+  Map<String,String> named=Map.of("workspaceName","prod","mode","plan");
+  String key=Identifiers.defaultOperationKey("otf",null,named);
+  assertEquals(key,Identifiers.defaultOperationKey("otf",null,new LinkedHashMap<>(named)),"deterministic");
+  assertEquals(key,Identifiers.defaultOperationKey("otf"," ",named),"blank is absent");
+  assertEquals(key,Identifiers.required(key,"operationKey"));
+  assertTrue(key.startsWith("otf-"));
+  assertNotEquals(key,Identifiers.defaultOperationKey("otf",null,Map.of("workspaceName","dev","mode","plan")));
+  assertNotEquals(key,Identifiers.defaultOperationKey("otf",null,Map.of("workspaceName","prod","mode","apply")));
+  assertEquals(Identifiers.defaultOperationKey("otf",null),Identifiers.defaultOperationKey("otf",null,Map.of()));
+  assertEquals(Identifiers.defaultOperationKey("otf",null),Identifiers.defaultOperationKey("otf",null,null));
+  // No ID never collides with an ID, whatever the parameters.
+  assertNotEquals(Identifiers.defaultOperationKey("otf",null,Map.of("a","1")),Identifiers.defaultOperationKey("otf","a",Map.of("a","1")));
+  assertThrows(IllegalArgumentException.class,()->Identifiers.defaultOperationKey("otf","bad\nid",named));
  }
  @Test void safeUrls() {
   assertEquals("https://iac.example.org", HttpJsonClient.validateUrl("https://iac.example.org/", false).toString());
