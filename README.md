@@ -109,7 +109,7 @@ ResolvedTarget resolve(String connectionId, String targetId, Map<String,String> 
 - `request(method, path, query, body)` appends `query` in iteration order, percent-encoding keys and values (UTF-8, RFC 3986; only letters, digits, and `-._~` are kept). `filter[organization]` and `name==acme` are both safe as given. Query values never appear in exceptions: `IacHttpException` carries only the method and path. `request(method, path, body)` is unchanged.
 - The client only encodes; the query syntax is the provider's. For example, Terrakube filters use RSQL, where a value with spaces or reserved characters must be quoted (`name=='my ws'`) and `*` can act as a wildcard. Whatever the filter, compare the returned names exactly before counting matches: a server-side match that is case-insensitive or a wildcard is not an exact match.
 - `HttpJsonClient.pathSegment(name)` percent-encodes one path segment, so `/` and other reserved characters cannot change the path: `"/api/v2/organizations/" + pathSegment(org) + "/workspaces/" + pathSegment(name)`. It rejects empty values, `.` and `..`.
-- Paths must start with `/` and may not contain `?`, `#`, or `.`/`..` segments, whether literal or percent-encoded.
+- Paths must start with a single `/` and may not contain `?`, `#`, or `.`/`..` segments, whether literal or percent-encoded.
 
 ## Security
 

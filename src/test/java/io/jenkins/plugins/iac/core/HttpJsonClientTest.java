@@ -44,7 +44,7 @@ class HttpJsonClientTest {
  }
  @Test void rejectsUnsafePaths() {
   try(HttpJsonClient c=new HttpJsonClient("https://iac.example.org","t",false)){
-   for(String bad:new String[]{null,"api","/a/../b","/a/..","/a/./b","/a/%2e%2E/b","/a/..%2Fb","/a/%2E%2E%5Cb","/a?x=1","/a#f","/a/%zz","/a/%"})
+   for(String bad:new String[]{null,"api","/a/../b","/a/..","/a/./b","/a/%2e%2E/b","/a/..%2Fb","/a/%2E%2E%5Cb","/a?x=1","/a#f","/a/%zz","/a/%","//evil.example/x"})
     assertThrows(IllegalArgumentException.class,()->c.uri(bad,null),String.valueOf(bad));
    assertEquals("https://iac.example.org/a//b",c.uri("/a//b",null).toString());
   }
