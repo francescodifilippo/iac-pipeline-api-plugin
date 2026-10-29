@@ -12,6 +12,9 @@ import hudson.util.ListBoxModel;
 import hudson.util.Secret;
 import java.util.List;
 import jenkins.model.Jenkins;
+import org.htmlunit.html.DomElement;
+import org.htmlunit.html.DomNode;
+import org.htmlunit.html.HtmlForm;
 import org.htmlunit.html.HtmlPage;
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +50,20 @@ class AbstractIacConnectionsTest {
   assertEquals(URL,servers.get(0).getUrl());
   assertEquals("iac-token",servers.get(0).getCredentialsId());
   assertFalse(servers.get(0).isAllowHttp());
+ }
+
+ @Test void deletingTheLastConnectionClearsTheList() throws Exception {
+  connections().setServers(List.of(new Connection("prod",URL,"iac-token")));
+  HtmlPage page=j.createWebClient().goTo("configure");
+  HtmlForm form=page.getFormByName("config");
+  DomNode chunk=form.querySelector("input[name='_.url'][value='"+URL+"']");
+  while(chunk!=null && !(chunk instanceof DomElement e && e.getAttribute("class").contains("repeated-chunk")))chunk=chunk.getParentNode();
+  assertNotNull(chunk,"connection entry rendered");
+  chunk.remove();
+  j.submit(form);
+  assertEquals(List.of(),connections().getServers());
+  j.configRoundtrip();
+  assertEquals(List.of(),connections().getServers());
  }
 
  @Test void credentialItemsRequireAdminister() {

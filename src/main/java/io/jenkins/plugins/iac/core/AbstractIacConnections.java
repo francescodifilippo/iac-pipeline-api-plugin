@@ -2,8 +2,11 @@ package io.jenkins.plugins.iac.core;
 import hudson.model.Run;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
+import hudson.model.Descriptor.FormException;
 import jenkins.model.GlobalConfiguration;
+import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.StaplerRequest2;
 import java.util.*;
 /**
  * Optional HTTP bearer-token connection helper for provider plugins.
@@ -22,6 +25,13 @@ public abstract class AbstractIacConnections extends GlobalConfiguration {
    HttpJsonClient.validateUrl(c.getUrl(),c.isAllowHttp());
   }
   servers=new ArrayList<>(checked);save();
+ }
+ /** A repeatable list with every entry deleted submits no "servers" key at all, so binding alone would keep the old list. */
+ @Override public boolean configure(StaplerRequest2 req,JSONObject json) throws FormException {
+  boolean noServers=!json.has("servers");
+  req.bindJSON(this,json);
+  if(noServers)setServers(List.of());
+  return true;
  }
  public Connection requireServer(String name){return getServers().stream().filter(s->s.getName().equals(name))
    .findFirst().orElseThrow(()->new IllegalArgumentException("Unknown IaC connection: "+name));}
