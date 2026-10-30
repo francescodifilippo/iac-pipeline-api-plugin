@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Keep progress in serializable fields and call {@link #save} after changing them and before each remote side
  * effect, so that a resumed execution knows what it already did and repeats only safe calls. An exception from
- * {@link #advance} fails the step, except while Jenkins shuts down: a restart interrupts the running round, and the
- * resumed execution runs it again. Aborting the build stops polling and the body, never the remote work.
+ * {@link #advance} fails the step, except while Jenkins shuts down: a restart interrupts the running round, which then
+ * neither fails, polls nor starts the body, and the resumed execution runs it again. Aborting the build stops polling and the body, never the remote work.
  * <p>
  * {@link RemoteExecution} does not extend this class, so that executions saved by earlier versions still resume.
  */
@@ -51,16 +51,23 @@ public abstract class AsyncBlockExecution extends StepExecution {
  @Override public final void onResume(){if(!bodyStarted)schedule(0);}
  private void schedule(long seconds){scheduled=Timer.get().schedule(this::round,seconds,TimeUnit.SECONDS);}
  private void round(){
-  if(bodyStarted||stopped)return;
+  if(bodyStarted||stopped||terminating())return;
   try{
-   if(advance())startBody();
+   boolean ready=advance();
+   if(terminating())return;
+   if(ready)startBody();
    else if(!stopped)schedule(pollingSeconds());
   }catch(Throwable e){
-   // Shutting Jenkins down interrupts a running round. The build resumes after the restart and runs the round again.
-   Jenkins jenkins=Jenkins.getInstanceOrNull();
-   if(jenkins==null||jenkins.isTerminating())return;
-   getContext().onFailure(e);
+   if(!terminating())getContext().onFailure(e);
   }
+ }
+ /**
+  * True while Jenkins shuts down, which interrupts a running round. The round then does nothing more, whatever
+  * {@link #advance} returned or threw: the build resumes after the restart and runs the round again.
+  */
+ private static boolean terminating(){
+  Jenkins jenkins=Jenkins.getInstanceOrNull();
+  return jenkins==null||jenkins.isTerminating();
  }
  private void startBody() throws Exception {
   if(stopped||bodyStarted)return;
