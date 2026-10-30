@@ -54,8 +54,8 @@ class DeclarativeLifecycleTest {
  @Test void planThenApplyOnSameTargetWithDefaultKeysSubmitsTwice() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"plan-apply",
-     "stage('plan') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'plan') }\n steps { echo 'plan body' } }\n"+
-     "stage('apply') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('plan') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'plan') }\n steps { echo 'plan body' } }\n"+
+     "stage('apply') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'apply') }\n steps { echo 'apply body' } }");
    WorkflowRun b=j.buildAndAssertSuccess(p);
    assertEquals(2,SUBMITS.size(),SUBMITS.toString());
    assertTrue(SUBMITS.get(0).startsWith("plan:"));
@@ -75,8 +75,8 @@ class DeclarativeLifecycleTest {
  @Test void duplicateExplicitOperationKeyFailsClearly() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"duplicate-key",
-     "stage('plan') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'plan', operationKey: 'deploy') }\n steps { echo 'plan body' } }\n"+
-     "stage('apply') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'apply', operationKey: 'deploy') }\n steps { echo 'apply body' } }");
+     "stage('plan') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'plan', operationKey: 'deploy') }\n steps { echo 'plan body' } }\n"+
+     "stage('apply') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'apply', operationKey: 'deploy') }\n steps { echo 'apply body' } }");
    WorkflowRun b=j.buildAndAssertStatus(Result.FAILURE,p);
    assertEquals(1,SUBMITS.size(),SUBMITS.toString());
    j.assertLogContains("operationKey 'deploy' is already used by another provision step in this build",b);
@@ -91,8 +91,8 @@ class DeclarativeLifecycleTest {
    submitCompletes=false;
    STATUS.add("503");STATUS.add("done");
    WorkflowJob p=pipeline(j,"async-await",
-     "stage('submit') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'apply', operationKey: 'deploy', waitForCompletion: false) }\n steps { echo 'submitted' } }\n"+
-     "stage('await') { options { fakeAwait(server: 'conn', operationKey: 'deploy', pollingSeconds: 5) }\n steps { echo 'awaited' } }");
+     "stage('submit') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'apply', operationKey: 'deploy', waitForCompletion: false) }\n steps { echo 'submitted' } }\n"+
+     "stage('await') { options { fakeAwait(connection: 'conn', operationKey: 'deploy', pollingSeconds: 5) }\n steps { echo 'awaited' } }");
    WorkflowRun b=j.buildAndAssertSuccess(p);
    assertEquals(1,SUBMITS.size(),SUBMITS.toString());
    assertEquals(2,STATUS_CALLS.get());
@@ -107,7 +107,7 @@ class DeclarativeLifecycleTest {
  @Test void stopAfterBodyStartedCancelsBody() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"stop-body",
-     "stage('apply') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'apply') }\n steps { script { try { sleep 300; echo 'after sleep' } catch (e) { echo \"body cancelled: ${e}\"; throw e } } } }");
+     "stage('apply') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'apply') }\n steps { script { try { sleep 300; echo 'after sleep' } catch (e) { echo \"body cancelled: ${e}\"; throw e } } } }");
    WorkflowRun b=p.scheduleBuild2(0).waitForStart();
    j.waitForMessage("Sleeping for",b);
    RemoteExecution execution=null;
@@ -126,7 +126,7 @@ class DeclarativeLifecycleTest {
   sessions.then(j -> {
    submitCompletes=false;
    WorkflowJob p=pipeline(j,"resume",
-     "stage('apply') { options { fakeProvision(server: 'conn', workspaceId: 'ws-1', mode: 'apply', pollingSeconds: 5) }\n steps { echo 'after resume' } }");
+     "stage('apply') { options { fakeProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'apply', pollingSeconds: 5) }\n steps { echo 'after resume' } }");
    WorkflowRun b=p.scheduleBuild2(0).waitForStart();
    j.waitForMessage("accepted remote ID run-1",b);
   });
@@ -143,7 +143,7 @@ class DeclarativeLifecycleTest {
  @Test void provisionByNameResolvesOnceAndSubmitsResolvedId() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"by-name",
-     "stage('apply') { options { fakeLookupProvision(server: 'conn', workspaceName: 'prod', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('apply') { options { fakeLookupProvision(connection: 'conn', workspaceName: 'prod', mode: 'apply') }\n steps { echo 'apply body' } }");
    WorkflowRun b=j.buildAndAssertSuccess(p);
    assertEquals(List.of("null {workspaceName=prod, mode=apply}"),RESOLVES);
    // Resolution replaced the name with IDs: metadata, submit and the stored operation only see the result.
@@ -165,7 +165,7 @@ class DeclarativeLifecycleTest {
  @Test void lookupStepWithIdBehavesAsBefore() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"by-id",
-     "stage('apply') { options { fakeLookupProvision(server: 'conn', workspaceId: 'ws-1', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('apply') { options { fakeLookupProvision(connection: 'conn', workspaceId: 'ws-1', mode: 'apply') }\n steps { echo 'apply body' } }");
    WorkflowRun b=j.buildAndAssertSuccess(p);
    assertEquals(List.of("ws-1 {mode=apply}"),RESOLVES);
    assertEquals(List.of("ws-1 {mode=apply}"),REQUESTS);
@@ -180,8 +180,8 @@ class DeclarativeLifecycleTest {
    submitCompletes=false;
    STATUS.add("done");
    WorkflowJob p=pipeline(j,"by-name-await",
-     "stage('submit') { options { fakeLookupProvision(server: 'conn', workspaceName: 'prod', mode: 'apply', operationKey: 'deploy', waitForCompletion: false) }\n steps { echo 'submitted' } }\n"+
-     "stage('await') { options { fakeAwait(server: 'conn', operationKey: 'deploy', pollingSeconds: 5) }\n steps { echo 'awaited' } }");
+     "stage('submit') { options { fakeLookupProvision(connection: 'conn', workspaceName: 'prod', mode: 'apply', operationKey: 'deploy', waitForCompletion: false) }\n steps { echo 'submitted' } }\n"+
+     "stage('await') { options { fakeAwait(connection: 'conn', operationKey: 'deploy', pollingSeconds: 5) }\n steps { echo 'awaited' } }");
    WorkflowRun b=j.buildAndAssertSuccess(p);
    assertEquals(1,RESOLVES.size(),"await does not resolve");
    assertEquals(1,SUBMITS.size(),SUBMITS.toString());
@@ -195,12 +195,12 @@ class DeclarativeLifecycleTest {
  @Test void resolutionFailureFailsStageWithoutRunningBody() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"no-match",
-     "stage('apply') { options { fakeLookupProvision(server: 'conn', workspaceName: 'missing', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('apply') { options { fakeLookupProvision(connection: 'conn', workspaceName: 'missing', mode: 'apply') }\n steps { echo 'apply body' } }");
    WorkflowRun b=j.buildAndAssertStatus(Result.FAILURE,p);
    j.assertLogContains("No fake workspace named 'missing'",b);
    j.assertLogNotContains("apply body",b);
    p=pipeline(j,"ambiguous",
-     "stage('apply') { options { fakeLookupProvision(server: 'conn', workspaceName: 'dup', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('apply') { options { fakeLookupProvision(connection: 'conn', workspaceName: 'dup', mode: 'apply') }\n steps { echo 'apply body' } }");
    b=j.buildAndAssertStatus(Result.FAILURE,p);
    j.assertLogContains("2 fake workspaces named 'dup'; use workspaceId",b);
    j.assertLogNotContains("apply body",b);
@@ -214,7 +214,7 @@ class DeclarativeLifecycleTest {
  @Test void missingTargetFailsClearly() throws Throwable {
   sessions.then(j -> {
    WorkflowJob p=pipeline(j,"neither",
-     "stage('apply') { options { fakeLookupProvision(server: 'conn', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('apply') { options { fakeLookupProvision(connection: 'conn', mode: 'apply') }\n steps { echo 'apply body' } }");
    WorkflowRun b=j.buildAndAssertStatus(Result.FAILURE,p);
    j.assertLogContains("Set either workspaceId or workspaceName",b);
    j.assertLogNotContains("apply body",b);
@@ -222,7 +222,7 @@ class DeclarativeLifecycleTest {
    // accept that), hits the default resolve.
    for(String args:List.of("workspaceId: '', ","")){
     p=pipeline(j,"no-id-"+args.length(),
-      "stage('apply') { options { fakeProvision(server: 'conn', "+args+"mode: 'apply') }\n steps { echo 'apply body' } }");
+      "stage('apply') { options { fakeProvision(connection: 'conn', "+args+"mode: 'apply') }\n steps { echo 'apply body' } }");
     b=j.buildAndAssertStatus(Result.FAILURE,p);
     j.assertLogContains("fake target id is required",b);
     j.assertLogNotContains("apply body",b);
@@ -235,7 +235,7 @@ class DeclarativeLifecycleTest {
   sessions.then(j -> {
    blockSubmit=true;
    WorkflowJob p=pipeline(j,"restart-resolved",
-     "stage('apply') { options { fakeLookupProvision(server: 'conn', workspaceName: 'prod', mode: 'apply') }\n steps { echo 'apply body' } }");
+     "stage('apply') { options { fakeLookupProvision(connection: 'conn', workspaceName: 'prod', mode: 'apply') }\n steps { echo 'apply body' } }");
    WorkflowRun b=p.scheduleBuild2(0).waitForStart();
    j.waitForMessage("submitting target ws-prod",b);
   });
@@ -302,8 +302,8 @@ class DeclarativeLifecycleTest {
 
  public static final class FakeProvisionStep extends AbstractProvisionStep {
   private String mode="plan";
-  @DataBoundConstructor public FakeProvisionStep(String server,String workspaceId){super(server,workspaceId);}
-  public String getServer(){return getConnectionId();}
+  @DataBoundConstructor public FakeProvisionStep(String connection,String workspaceId){super(connection,workspaceId);}
+  public String getConnection(){return getConnectionId();}
   public String getWorkspaceId(){return getTargetId();}
   public String getMode(){return mode;}
   @DataBoundSetter public void setMode(String value){mode=value;}
@@ -319,8 +319,8 @@ class DeclarativeLifecycleTest {
  /** A provider step that accepts either an ID or a name: the ID is a setter since Declarative requires constructor args. */
  public static final class FakeLookupProvisionStep extends AbstractProvisionStep {
   private String workspaceName,mode="plan";
-  @DataBoundConstructor public FakeLookupProvisionStep(String server){super(server);}
-  public String getServer(){return getConnectionId();}
+  @DataBoundConstructor public FakeLookupProvisionStep(String connection){super(connection);}
+  public String getConnection(){return getConnectionId();}
   public String getWorkspaceId(){return getTargetId();}
   @DataBoundSetter public void setWorkspaceId(String value){setTargetId(value);}
   public String getWorkspaceName(){return workspaceName;}
@@ -343,8 +343,8 @@ class DeclarativeLifecycleTest {
  }
 
  public static final class FakeAwaitStep extends AbstractAwaitStep {
-  @DataBoundConstructor public FakeAwaitStep(String server,String operationKey){super(server,operationKey);}
-  public String getServer(){return getConnectionId();}
+  @DataBoundConstructor public FakeAwaitStep(String connection,String operationKey){super(connection,operationKey);}
+  public String getConnection(){return getConnectionId();}
   @Override protected String provider(){return "fake";}
   @TestExtension public static final class DescriptorImpl extends StepDescriptor {
    @Override public String getFunctionName(){return "fakeAwait";}

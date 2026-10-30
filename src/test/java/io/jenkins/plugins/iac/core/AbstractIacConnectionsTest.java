@@ -39,21 +39,21 @@ class AbstractIacConnectionsTest {
  @Test void roundtripsOneConnectionWithCredentialSelect() throws Exception {
   Connection c=new Connection("prod",URL,"iac-token");
   c.setAllowHttp(false);
-  connections().setServers(List.of(c));
+  connections().setConnections(List.of(c));
   HtmlPage page=j.createWebClient().goTo("configure");
   assertNotNull(page.querySelector("select.credentials-select[name='_.credentialsId']"),"credentials select rendered");
   // The credentialsId select is filled by AJAX; an empty submission would be rejected by Connection.
   j.configRoundtrip();
-  List<Connection> servers=connections().getServers();
-  assertEquals(1,servers.size());
-  assertEquals("prod",servers.get(0).getName());
-  assertEquals(URL,servers.get(0).getUrl());
-  assertEquals("iac-token",servers.get(0).getCredentialsId());
-  assertFalse(servers.get(0).isAllowHttp());
+  List<Connection> saved=connections().getConnections();
+  assertEquals(1,saved.size());
+  assertEquals("prod",saved.get(0).getName());
+  assertEquals(URL,saved.get(0).getUrl());
+  assertEquals("iac-token",saved.get(0).getCredentialsId());
+  assertFalse(saved.get(0).isAllowHttp());
  }
 
  @Test void deletingTheLastConnectionClearsTheList() throws Exception {
-  connections().setServers(List.of(new Connection("prod",URL,"iac-token")));
+  connections().setConnections(List.of(new Connection("prod",URL,"iac-token")));
   HtmlPage page=j.createWebClient().goTo("configure");
   HtmlForm form=page.getFormByName("config");
   DomNode chunk=form.querySelector("input[name='_.url'][value='"+URL+"']");
@@ -61,9 +61,9 @@ class AbstractIacConnectionsTest {
   assertNotNull(chunk,"connection entry rendered");
   chunk.remove();
   j.submit(form);
-  assertEquals(List.of(),connections().getServers());
+  assertEquals(List.of(),connections().getConnections());
   j.configRoundtrip();
-  assertEquals(List.of(),connections().getServers());
+  assertEquals(List.of(),connections().getConnections());
  }
 
  @Test void credentialItemsRequireAdminister() {

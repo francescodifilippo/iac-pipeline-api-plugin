@@ -13,10 +13,10 @@ import java.util.*;
  * IacBackend does not require this transport model; non-HTTP providers may own a different configuration.
  */
 public abstract class AbstractIacConnections extends GlobalConfiguration {
- private List<Connection> servers = new ArrayList<>();
+ private List<Connection> connections = new ArrayList<>();
  protected AbstractIacConnections(){load();}
- public List<Connection> getServers(){return servers == null?List.of():List.copyOf(servers);}
- @DataBoundSetter public void setServers(List<Connection> input){
+ public List<Connection> getConnections(){return connections == null?List.of():List.copyOf(connections);}
+ @DataBoundSetter public void setConnections(List<Connection> input){
   jenkins.model.Jenkins.get().checkPermission(jenkins.model.Jenkins.ADMINISTER);
   List<Connection> checked=input==null?List.of():List.copyOf(input);
   Set<String> names=new HashSet<>();
@@ -24,21 +24,21 @@ public abstract class AbstractIacConnections extends GlobalConfiguration {
    if(!names.add(c.getName())) throw new IllegalArgumentException("Duplicate IaC connection: "+c.getName());
    HttpJsonClient.validateUrl(c.getUrl(),c.isAllowHttp());
   }
-  servers=new ArrayList<>(checked);save();
+  connections=new ArrayList<>(checked);save();
  }
- /** A repeatable list with every entry deleted submits no "servers" key at all, so binding alone would keep the old list. */
+ /** A repeatable list with every entry deleted submits no "connections" key at all, so binding alone would keep the old list. */
  @Override public boolean configure(StaplerRequest2 req,JSONObject json) throws FormException {
-  boolean noServers=!json.has("servers");
+  boolean noConnections=!json.has("connections");
   req.bindJSON(this,json);
-  if(noServers)setServers(List.of());
+  if(noConnections)setConnections(List.of());
   return true;
  }
- public Connection requireServer(String name){return getServers().stream().filter(s->s.getName().equals(name))
+ public Connection requireConnection(String name){return getConnections().stream().filter(s->s.getName().equals(name))
    .findFirst().orElseThrow(()->new IllegalArgumentException("Unknown IaC connection: "+name));}
- public HttpJsonClient client(String server, Run<?,?> run){
-   Connection c=requireServer(server);
+ public HttpJsonClient client(String connection, Run<?,?> run){
+   Connection c=requireConnection(connection);
    StringCredentials token=CredentialsProvider.findCredentialById(c.getCredentialsId(),StringCredentials.class,run,Collections.emptyList());
-   if(token==null) throw new IllegalArgumentException("Missing or inaccessible credential for server: "+server);
+   if(token==null) throw new IllegalArgumentException("Missing or inaccessible credential for connection: "+connection);
    return new HttpJsonClient(c.getUrl(),token.getSecret().getPlainText(),c.isAllowHttp());
  }
 }

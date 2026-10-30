@@ -83,7 +83,7 @@ Supporting names in a provider takes a step change and a backend change.
 - `AbstractProvisionStep` accepts a null or blank `targetId` (stored as null, `getTargetId()` returns null). A stage option may omit a `@DataBoundConstructor` argument, but Pipeline Syntax documentation lists constructor arguments as required. The cleaner form is `super(connectionId)` with the ID as an optional setter, which keeps existing `workspaceId: '...'` pipelines working:
 
   ```java
-  @DataBoundConstructor public OtfProvisionStep(String server){super(server);}
+  @DataBoundConstructor public OtfProvisionStep(String connection){super(connection);}
   @DataBoundSetter public void setWorkspaceId(String value){setTargetId(value);}
   ```
 
