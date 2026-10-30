@@ -20,7 +20,7 @@ public final class Connection implements Describable<Connection>, Serializable {
  private final String name, url, credentialsId;
  private boolean allowHttp;
  @DataBoundConstructor public Connection(String name,String url,String credentialsId){
-   this.name=Identifiers.required(name,"server");this.url=url;this.credentialsId=Identifiers.required(credentialsId,"credentialsId");
+   this.name=Identifiers.required(name,"connection");this.url=url;this.credentialsId=Identifiers.required(credentialsId,"credentialsId");
  }
  public String getName(){return name;}
  public String getUrl(){return url;}
