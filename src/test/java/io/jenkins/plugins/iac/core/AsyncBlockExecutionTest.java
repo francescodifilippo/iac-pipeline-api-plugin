@@ -88,6 +88,21 @@ class AsyncBlockExecutionTest {
   });
  }
 
+ @Test void aRoundThatPollsAfterTheShutdownInterruptDoesNotRunAgainUntilResumed() throws Throwable {
+  sessions.then(j -> {
+   WorkflowRun b=pipeline(j,"polling","fakeSetup(polls: 1, holdAt: 1, pollWhenInterrupted: true)").scheduleBuild2(0).waitForStart();
+   j.waitForMessage("holding round 1",b);
+  });
+  sessions.then(j -> {
+   WorkflowRun b=j.jenkins.getItemByFullName("polling",WorkflowJob.class).getBuildByNumber(1);
+   j.assertBuildStatusSuccess(j.waitForCompletion(b));
+   // A round scheduled by the interrupted execution of the first session would run after one second.
+   Thread.sleep(2500);
+   assertEquals(2,ROUNDS.get());
+   assertEquals(1,count(JenkinsRule.getLog(b),"setup body"));
+  });
+ }
+
  @Test void abortStopsPollingWithoutTheBody() throws Throwable {
   sessions.then(j -> {
    WorkflowRun b=pipeline(j,"abort","fakeSetup(polls: 1000)").scheduleBuild2(0).waitForStart();
@@ -111,14 +126,17 @@ class AsyncBlockExecutionTest {
 
  public static final class FakeSetupStep extends Step {
   private int polls,failAt,holdAt;
+  private boolean pollWhenInterrupted;
   @DataBoundConstructor public FakeSetupStep(){}
   public int getPolls(){return polls;}
   public int getFailAt(){return failAt;}
   public int getHoldAt(){return holdAt;}
+  public boolean isPollWhenInterrupted(){return pollWhenInterrupted;}
   @DataBoundSetter public void setPolls(int v){polls=v;}
   @DataBoundSetter public void setFailAt(int v){failAt=v;}
   @DataBoundSetter public void setHoldAt(int v){holdAt=v;}
-  @Override public StepExecution start(StepContext context){return new FakeSetupExecution(context,polls,failAt,holdAt);}
+  @DataBoundSetter public void setPollWhenInterrupted(boolean v){pollWhenInterrupted=v;}
+  @Override public StepExecution start(StepContext context){return new FakeSetupExecution(context,polls,failAt,holdAt,pollWhenInterrupted);}
   @TestExtension public static final class DescriptorImpl extends StepDescriptor {
    @Override public String getFunctionName(){return "fakeSetup";}
    @Override public boolean takesImplicitBlockArgument(){return true;}
@@ -131,9 +149,10 @@ class AsyncBlockExecutionTest {
   /** Makes the next round report ready, so that a resumed build ends quickly. */
   static volatile boolean finishNow;
   private final int polls,failAt,holdAt;
+  private final boolean pollWhenInterrupted;
   private int progress;
-  FakeSetupExecution(StepContext context,int polls,int failAt,int holdAt){
-   super(context,"fake");this.polls=polls;this.failAt=failAt;this.holdAt=holdAt;
+  FakeSetupExecution(StepContext context,int polls,int failAt,int holdAt,boolean pollWhenInterrupted){
+   super(context,"fake");this.polls=polls;this.failAt=failAt;this.holdAt=holdAt;this.pollWhenInterrupted=pollWhenInterrupted;
   }
   @Override protected int pollingSeconds(){return 1;}
   @Override protected boolean advance() throws Exception {
@@ -145,7 +164,12 @@ class AsyncBlockExecutionTest {
    if(round==holdAt){
     log("holding round "+round);
     // Stands for a remote call that is still running; only an interrupt ends it.
-    new CountDownLatch(1).await();
+    try{new CountDownLatch(1).await();}
+    catch(InterruptedException e){
+     // As a client that reports the interrupt as a transient error, so that the round asks to poll again.
+     if(pollWhenInterrupted)return false;
+     throw e;
+    }
    }
    return finishNow||progress>polls;
   }
