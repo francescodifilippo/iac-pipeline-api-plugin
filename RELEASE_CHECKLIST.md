@@ -15,11 +15,11 @@ Status: **pre-release**.
 
 ## Before Jenkins hosting / first release
 
-- [ ] Complete resolved dependency-tree and bundled-license audit
+- [x] Complete resolved dependency-tree and bundled-license audit: the HPI bundles no third-party library, only Jenkins plugin dependencies
 - [ ] Run Jenkins Plugin Compatibility Tester / plugin verifier against intended supported versions
 - [ ] Add deeper Pipeline restart/abort tests around live `RemoteExecution`
 - [ ] Validate timeout, abort and ambiguous-submit race conditions
-- [ ] Perform an internal HPI installation on the target Jenkins baseline
+- [x] Perform an internal HPI installation on the target Jenkins baseline (2.568.3 on 2026-10-30: plugins resolved by the BOM, `agent none` Declarative builds; `otfWorkspace` and `terrakubeWorkspace` against a local stub, `ociRmStack` up to the real OCI endpoint (401 with a dummy key))
 - [ ] Open Jenkins plugin hosting request
 - [ ] After Jenkins forks the repository, update project/SCM URLs to the canonical `jenkinsci` repository
 - [ ] Obtain Jenkins repository release permissions
