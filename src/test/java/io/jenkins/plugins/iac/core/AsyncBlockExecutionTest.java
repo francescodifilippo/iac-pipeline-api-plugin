@@ -6,6 +6,7 @@ import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
@@ -70,6 +71,23 @@ class AsyncBlockExecutionTest {
   });
  }
 
+ @Test void aRestartDuringARoundRunsTheRoundAgain() throws Throwable {
+  sessions.then(j -> {
+   WorkflowRun b=pipeline(j,"interrupted","fakeSetup(polls: 1, holdAt: 1)").scheduleBuild2(0).waitForStart();
+   // Shutting Jenkins down interrupts the round that is still waiting for its remote call.
+   j.waitForMessage("holding round 1",b);
+  });
+  sessions.then(j -> {
+   WorkflowRun b=j.jenkins.getItemByFullName("interrupted",WorkflowJob.class).getBuildByNumber(1);
+   j.assertBuildStatusSuccess(j.waitForCompletion(b));
+   String log=JenkinsRule.getLog(b);
+   assertEquals(1,count(log,"saved progress 1;"),log);
+   assertEquals(1,count(log,"saved progress 2;"),log);
+   assertFalse(log.contains("InterruptedException"),log);
+   assertEquals(1,count(log,"setup body"));
+  });
+ }
+
  @Test void abortStopsPollingWithoutTheBody() throws Throwable {
   sessions.then(j -> {
    WorkflowRun b=pipeline(j,"abort","fakeSetup(polls: 1000)").scheduleBuild2(0).waitForStart();
@@ -92,13 +110,15 @@ class AsyncBlockExecutionTest {
  }
 
  public static final class FakeSetupStep extends Step {
-  private int polls,failAt;
+  private int polls,failAt,holdAt;
   @DataBoundConstructor public FakeSetupStep(){}
   public int getPolls(){return polls;}
   public int getFailAt(){return failAt;}
+  public int getHoldAt(){return holdAt;}
   @DataBoundSetter public void setPolls(int v){polls=v;}
   @DataBoundSetter public void setFailAt(int v){failAt=v;}
-  @Override public StepExecution start(StepContext context){return new FakeSetupExecution(context,polls,failAt);}
+  @DataBoundSetter public void setHoldAt(int v){holdAt=v;}
+  @Override public StepExecution start(StepContext context){return new FakeSetupExecution(context,polls,failAt,holdAt);}
   @TestExtension public static final class DescriptorImpl extends StepDescriptor {
    @Override public String getFunctionName(){return "fakeSetup";}
    @Override public boolean takesImplicitBlockArgument(){return true;}
@@ -110,9 +130,11 @@ class AsyncBlockExecutionTest {
   private static final long serialVersionUID=1L;
   /** Makes the next round report ready, so that a resumed build ends quickly. */
   static volatile boolean finishNow;
-  private final int polls,failAt;
+  private final int polls,failAt,holdAt;
   private int progress;
-  FakeSetupExecution(StepContext context,int polls,int failAt){super(context,"fake");this.polls=polls;this.failAt=failAt;}
+  FakeSetupExecution(StepContext context,int polls,int failAt,int holdAt){
+   super(context,"fake");this.polls=polls;this.failAt=failAt;this.holdAt=holdAt;
+  }
   @Override protected int pollingSeconds(){return 1;}
   @Override protected boolean advance() throws Exception {
    int round=ROUNDS.incrementAndGet();
@@ -120,6 +142,11 @@ class AsyncBlockExecutionTest {
    progress++;
    save();
    log("round "+round+" of "+(polls+1)+", saved progress "+progress+";");
+   if(round==holdAt){
+    log("holding round "+round);
+    // Stands for a remote call that is still running; only an interrupt ends it.
+    new CountDownLatch(1).await();
+   }
    return finishNow||progress>polls;
   }
  }

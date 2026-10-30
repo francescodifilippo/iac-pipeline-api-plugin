@@ -1,5 +1,6 @@
 package io.jenkins.plugins.iac.core;
 import hudson.model.TaskListener;
+import jenkins.model.Jenkins;
 import jenkins.util.Timer;
 import org.jenkinsci.plugins.workflow.steps.*;
 import java.io.IOException;
@@ -13,7 +14,8 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Keep progress in serializable fields and call {@link #save} after changing them and before each remote side
  * effect, so that a resumed execution knows what it already did and repeats only safe calls. An exception from
- * {@link #advance} fails the step. Aborting the build stops polling and the body, never the remote work.
+ * {@link #advance} fails the step, except while Jenkins shuts down: a restart interrupts the running round, and the
+ * resumed execution runs it again. Aborting the build stops polling and the body, never the remote work.
  * <p>
  * {@link RemoteExecution} does not extend this class, so that executions saved by earlier versions still resume.
  */
@@ -53,7 +55,12 @@ public abstract class AsyncBlockExecution extends StepExecution {
   try{
    if(advance())startBody();
    else if(!stopped)schedule(pollingSeconds());
-  }catch(Throwable e){getContext().onFailure(e);}
+  }catch(Throwable e){
+   // Shutting Jenkins down interrupts a running round. The build resumes after the restart and runs the round again.
+   Jenkins jenkins=Jenkins.getInstanceOrNull();
+   if(jenkins==null||jenkins.isTerminating())return;
+   getContext().onFailure(e);
+  }
  }
  private void startBody() throws Exception {
   if(stopped||bodyStarted)return;
