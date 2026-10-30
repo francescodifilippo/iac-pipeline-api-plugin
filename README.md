@@ -111,6 +111,25 @@ ResolvedTarget resolve(String connectionId, String targetId, Map<String,String> 
 - `HttpJsonClient.pathSegment(name)` percent-encodes one path segment, so `/` and other reserved characters cannot change the path: `"/api/v2/organizations/" + pathSegment(org) + "/workspaces/" + pathSegment(name)`. It rejects empty values, `.` and `..`.
 - Paths must start with a single `/` and may not contain `?`, `#`, or `.`/`..` segments, whether literal or percent-encoded.
 
+## Provider contract for setup steps
+
+Some provider steps prepare a target instead of running a job on it, for example `ociRmStack`, `otfWorkspace` and `terrakubeWorkspace`, which find or create a stack or workspace before their stage body runs. They are plain block-scoped `Step`s, not `AbstractProvisionStep`s, and their execution extends `AsyncBlockExecution`:
+
+```java
+final class OtfWorkspaceExecution extends AsyncBlockExecution {
+ OtfWorkspaceExecution(StepContext context, ...){super(context,"otf"); ...}
+ @Override protected boolean advance() throws Exception {
+  // remote work; return true when the body may run, false to poll again
+ }
+}
+```
+
+- `advance()` runs on a background thread, holding no executor: when the step starts, again after `pollingSeconds()` (default 10) while it returns false, and again after a controller restart until the body has started. The body then runs once.
+- Keep progress in serializable fields. Call `save()`, which waits for the build to be saved, after changing them and before each remote side effect (for example "create request sent"), so that a resumed execution repeats only safe calls.
+- An exception fails the step. Aborting the build stops polling and the body; it never cancels the remote work.
+- `log(message)` writes `IaC <provider>: <message>` to the build log; never log secrets. `startedAt()` is kept across restarts, for timeouts.
+- `RemoteExecution` does not extend `AsyncBlockExecution`, so that provision steps saved by earlier versions still resume.
+
 ## Security
 
 Credentials must never be stored in `SubmissionRequest.parameters`, `RemoteOperation.metadata`, logs, or Pipeline source. Provider plugins are responsible for resolving credentials from Jenkins Credentials at execution time.
