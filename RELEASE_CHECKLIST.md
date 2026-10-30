@@ -16,7 +16,7 @@ Status: **pre-release**.
 ## Before Jenkins hosting / first release
 
 - [x] Complete resolved dependency-tree and bundled-license audit: the HPI bundles no third-party library, only Jenkins plugin dependencies
-- [ ] Run Jenkins Plugin Compatibility Tester / plugin verifier against intended supported versions
+- [x] Run Jenkins Plugin Compatibility Tester / plugin verifier (PCT 1614.v891225c29865 on 2026-10-30: all tests pass against Jenkins 2.580.2, the latest LTS; the BOM 2.580.x plugins have the same versions as the tested ones, so this checks the newer core)
 - [ ] Add deeper Pipeline restart/abort tests around live `RemoteExecution`
 - [ ] Validate timeout, abort and ambiguous-submit race conditions
 - [x] Perform an internal HPI installation on the target Jenkins baseline (2.568.3 on 2026-10-30: plugins resolved by the BOM, `agent none` Declarative builds; `otfWorkspace` and `terrakubeWorkspace` against a local stub, `ociRmStack` up to the real OCI endpoint (401 with a dummy key))
